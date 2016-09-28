@@ -1,0 +1,13 @@
+{{extend 'layout.html'}}
+
+ <div class = "mainbox">
+<center><div class="label shadow"><h2>{{=title}}</h2></div></center>
+<br>
+{{for message in messages:}}
+<div class = "box shadow"><center><div class = "pin shadow"></div></center>{{=message}}</div>
+<p>
+    
+</p>
+
+{{pass}}
+</div>

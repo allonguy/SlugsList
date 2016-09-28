@@ -1,0 +1,33 @@
+{{left_sidebar_enabled,right_sidebar_enabled=False,('message' in globals())}}
+{{extend 'layout.html'}}
+
+<div class="mainbox">
+<center><div class="label">
+    <h1>About</h1>
+</div></center>
+<br>
+
+<center><div class="label shadow">Slugslist</div></center>
+<br>
+<center>
+    <div class="box shadow">
+        <center><div class = "pin shadow"></div></center>
+            <p>
+                  <center> Slugslist is a UCSC student project website created for CMPS 183 - Web Applications. The site was created to be a resource for students who are trying to network with other students at UCSC.
+                  </center>
+            </p>
+    </div>
+</center>
+<br><br>
+
+
+{{if not auth.is_logged_in():}}
+    <center>
+    {{=A("Back", _class="btn", _href=URL("default", "index"))}}
+    </center>
+{{pass}}
+
+</div>
+{{if not auth.is_logged_in():}}
+<script>$(".side").replaceWith("<div class='.side' '.sidefont'></div>")</script>
+{{pass}}

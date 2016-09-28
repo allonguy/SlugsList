@@ -1,0 +1,129 @@
+timestamp: 2015-03-16T02:56:51.143000
+CREATE TABLE auth_user(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    first_name CHAR(128),
+    last_name CHAR(128),
+    email CHAR(512),
+    password CHAR(512),
+    registration_key CHAR(512),
+    reset_password_key CHAR(512),
+    registration_id CHAR(512)
+);
+success!
+timestamp: 2015-03-16T02:56:51.176000
+CREATE TABLE auth_group(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    role CHAR(512),
+    description TEXT
+);
+success!
+timestamp: 2015-03-16T02:56:51.222000
+CREATE TABLE auth_membership(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER REFERENCES auth_user (id) ON DELETE CASCADE,
+    group_id INTEGER REFERENCES auth_group (id) ON DELETE CASCADE
+);
+success!
+timestamp: 2015-03-16T02:56:51.269000
+CREATE TABLE auth_permission(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER REFERENCES auth_group (id) ON DELETE CASCADE,
+    name CHAR(512),
+    table_name CHAR(512),
+    record_id INTEGER
+);
+success!
+timestamp: 2015-03-16T02:56:51.313000
+CREATE TABLE auth_event(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    time_stamp TIMESTAMP,
+    client_ip CHAR(512),
+    user_id INTEGER REFERENCES auth_user (id) ON DELETE CASCADE,
+    origin CHAR(512),
+    description TEXT
+);
+success!
+timestamp: 2015-03-16T02:56:51.353000
+CREATE TABLE auth_cas(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER REFERENCES auth_user (id) ON DELETE CASCADE,
+    created_on TIMESTAMP,
+    service CHAR(512),
+    ticket CHAR(512),
+    renew CHAR(1)
+);
+success!
+timestamp: 2015-03-16T02:56:51.407000
+CREATE TABLE majors(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name CHAR(512),
+    abbreviation CHAR(512)
+);
+success!
+timestamp: 2015-03-16T02:56:51.446000
+CREATE TABLE ucsc_classes(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name CHAR(512),
+    major INTEGER REFERENCES majors (id) ON DELETE CASCADE
+);
+success!
+timestamp: 2015-03-16T02:56:51.493000
+CREATE TABLE students(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER REFERENCES auth_user (id) ON DELETE CASCADE,
+    first_name CHAR(512),
+    last_name CHAR(512),
+    class_level CHAR(512),
+    major INTEGER REFERENCES majors (id) ON DELETE CASCADE,
+    minor INTEGER REFERENCES majors (id) ON DELETE CASCADE,
+    email CHAR(512),
+    class_list TEXT,
+    bio TEXT
+);
+success!
+timestamp: 2015-03-16T02:56:51.542000
+CREATE TABLE student_posts(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    student_id INTEGER REFERENCES students (id) ON DELETE CASCADE,
+    last_updated TIMESTAMP,
+    looking_for_tutor TEXT,
+    can_tutor TEXT,
+    study_group TEXT,
+    body TEXT
+);
+success!
+timestamp: 2015-03-16T02:56:51.589000
+CREATE TABLE matches(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    student1_id INTEGER REFERENCES students (id) ON DELETE CASCADE,
+    student2_id INTEGER REFERENCES students (id) ON DELETE CASCADE,
+    student1_active CHAR(1),
+    student2_active CHAR(1)
+);
+success!
+timestamp: 2015-03-16T02:56:51.629000
+CREATE TABLE threads(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    subject CHAR(512),
+    match_id INTEGER REFERENCES matches (id) ON DELETE CASCADE
+);
+success!
+timestamp: 2015-03-16T02:56:51.676000
+CREATE TABLE messages(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    thread_id INTEGER REFERENCES threads (id) ON DELETE CASCADE,
+    num_in_thread INTEGER,
+    sender_id INTEGER REFERENCES students (id) ON DELETE CASCADE,
+    recipient_id INTEGER REFERENCES students (id) ON DELETE CASCADE,
+    send_time TIMESTAMP,
+    body CHAR(512),
+    viewed CHAR(1)
+);
+success!
+timestamp: 2015-03-16T02:56:51.730000
+CREATE TABLE reviews(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    class_name INTEGER REFERENCES ucsc_classes (id) ON DELETE CASCADE,
+    review_text TEXT
+);
+success!

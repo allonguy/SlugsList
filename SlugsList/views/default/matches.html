@@ -1,0 +1,73 @@
+{{extend 'layout.html'}}
+
+<div class="mainbox">
+<center><div class="label shadow"><h2>{{=title}}</h2></div></center>
+<br>
+{{if len(matches) > 0:}}
+    {{if show_looking_for_tutor:}}
+        <center><div class = "label shadow">I can Tutor</div></center><br>
+            <div class = "matchContainer">
+                {{for match in matches:}}
+                    <div class = "matchBox shadow"><center><div class = "pin shadow"></div></center>
+                        {{=match.links.name_link}}
+                        {{=match.looking_for_tutor_ul}}
+                        <br><div id ="chatSqr" class="shadow">
+                            {{=match.links.chat_link}}
+                        </div>
+                        <div id="postSqr" class="shadow">
+                            {{=match.links.post_link}}
+                        </div>
+                        <div id="unmatchSqr" class="shadow">
+                            {{=match.links.unmatch_link}}
+                        </div>
+                    </div>
+                {{pass}}
+            </div>
+    {{pass}}
+
+    {{if show_can_tutor:}}
+        <br><center><div class = "label shadow">Can Tutor Me</div></center><br>
+            <div class = "matchContainer">
+                {{for match in matches:}}
+                    {{if match.can_tutor_str != "":}}
+                        <div class = "matchBox shadow"><center><div class = "pin shadow"></div></center>
+                            {{=match.links.name_link}}
+                            {{=match.can_tutor_ul}}
+                            <br><div id ="chatSqr" class="shadow">
+                            {{=match.links.chat_link}}
+                        </div>
+                        <div id="postSqr" class="shadow">
+                            {{=match.links.post_link}}
+                        </div>
+                        <div id="unmatchSqr" class="shadow">
+                            {{=match.links.unmatch_link}}
+                        </div>
+                        </div>
+                    {{pass}}
+                {{pass}}
+            </div>
+    {{pass}}
+
+    {{if show_study_group:}}
+       <br><center><div class = "label shadow">Looking for Study Groups</div></center><br>
+            <div class = "matchContainer">
+                {{for match in matches:}}
+                    <div class = "matchBox shadow"><center><div class = "pin shadow"></div></center>
+                        {{=match.links.name_link}}
+                        {{=match.study_group_ul}}
+                        <br><div id ="chatSqr" class="shadow">
+                            {{=match.links.chat_link}}
+                        </div>
+                        <div id="postSqr" class="shadow">
+                            {{=match.links.post_link}}
+                        </div>
+                        <div id="unmatchSqr" class="shadow">
+                            {{=match.links.unmatch_link}}
+                        </div>
+                    </div>
+                {{pass}}
+            </div>
+    {{pass}}
+
+{{pass}}
+</div>

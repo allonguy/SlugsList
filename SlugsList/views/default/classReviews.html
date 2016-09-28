@@ -1,0 +1,47 @@
+{{extend 'layout.html'}}
+
+<div class = "mainbox">
+<center><div class="label shadow"><h2>{{=title}}</h2></div></center>
+<br>
+<p>
+<center>
+{{if request.vars.id != None:}}
+    {{if form != None:}}
+        <p><div class = "box shadow"><center><div class = "pin shadow"></center>{{=form}}</div></div></center></p>
+    {{else:}}
+        <div class="allfolders">
+        {{for r in reviews:}}
+            <div class = "reviewBox shadow"><center><div class = "pin shadow"></div></center>{{=r}}</div>
+        {{pass}}
+		</div>
+</center>
+        <br>
+		<div class="allfolders">
+        {{=A('Back',_class='btn', _href=URL('default','classReviews'))}}
+        {{=A('Add a Review!',_class='btn', _href=URL('default','classReviews', vars=dict(id = request.vars.id, edit = 'true')))}}
+		</div>
+    {{pass}}
+{{elif len(outputs) > 0:}}
+    <!--- See default.py's classReviews function for the class this page uses --->
+    <!--- Ugly way to show how to use the links to make the bar that links to each major's section --->
+    <div class = "abbrcontain">
+    {{for output in outputs:}}
+        <div class = "abbrpost shadow">{{=output.link}}</div>
+    {{pass}}
+	</div>
+
+    {{for output in outputs:}}
+
+        <!--- This makes the links from the bar go to the appropriate section --->
+        <center><div class="label shadow">{{=A(output.db_entry.name, _id=output.db_entry.abbreviation)}}</div></center>
+
+		<div class="allfolders">
+            {{for entry in output.class_list:}}
+                <div class="foldercontain"><div class="tab"></div><div class ="folder"><div id ="foldertext">{{=entry}}</div></div></div>
+            {{pass}}
+		</div>
+    {{pass}}
+
+{{pass}}
+
+</div>

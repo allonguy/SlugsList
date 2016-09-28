@@ -1,0 +1,652 @@
+# -*- coding: utf-8 -*-
+
+#
+# All match-related classes can be found in modules/match.py.
+#
+from match import *
+
+# Return string from list of ID's
+def get_class_string(id_list):
+    class_string = ""
+    for id in id_list:
+        class_string += "%s, " % db(db.ucsc_classes.id == id).select().first().name
+    class_string = class_string[:-2]
+    return class_string
+
+def get_class_UL(id_list):
+    ul = UL()
+    for num,id in enumerate(id_list):
+        ul.insert(num, db(db.ucsc_classes.id == id).select().first().name)
+    return ul
+
+def index():
+    title = "Welcome to Slugslist!"
+    buttons = dict()
+    links = []
+
+    #
+    # Query active matches and return all associated links to front page. Each matched
+    # user will have their own post-it on the corkboard with their given links.
+    #
+    foo = ""
+    me = db(db.students.user_id == auth.user_id).select().first() or None
+    if me != None:
+        title = "Home"
+        match_results = db(db.matches.student1_id == me.id).select()
+        for result in match_results:
+            if result.student1_active:
+                links += [match_links(db, auth, result.student2_id)]
+        match_results = db(db.matches.student2_id == me.id).select()
+        for result in match_results:
+            if result.student2_active:
+                links += [match_links(db, auth, result.student1_id)]
+
+    response.title = "Slugslist - %s" % title
+    return dict(buttons=buttons, links=links, title=title, logged_in=(auth.is_logged_in()))
+
+@auth.requires_login()
+def account():
+    return dict()
+
+#
+# View a user's profile. Users can only edit their own profiles. Users can only view their own profile
+# and those of their matches. If you are viewing a match's profile, you will be given links to their
+# post, your conversation with them, and a link to unmatch with the user.
+#
+# Profile Information:
+#  * First Name
+#  * Last Name (only on your own profile)
+#  * Class Level
+#  * Major
+#  * Minor
+#  * E-mail (only on your own profile)
+#  * Class List
+#  * Bio
+#
+@auth.requires_login()
+def profile():
+    #
+    # This code determines whether or not you have access to view the profile with the
+    # given ID (no ID automatically redirects to your own page). If the page is not your
+    # own and does not belong to a match, you will be redirected to default/index. If the
+    # profile is your own but you have not created one, you will automatically be redirected
+    # to a profile edit page.
+    #
+    me = db(db.students.user_id == auth.user_id).select().first() or None
+    if me == None:
+        if request.vars.edit != 'true':
+            redirect(URL('default', 'profile', vars=dict(edit='true')))
+        else:
+            bad_access = False
+            is_mine = True
+            given_id = 0 # Guaranteed to lead to edit
+    else:
+        given_id = me.user_id if request.vars.id == None else int(request.vars.id)
+        bad_access = True
+        is_mine = (given_id == me.user_id)
+        if is_mine:
+            bad_access = False
+        else:
+            s2 = db(db.students.user_id == given_id).select().first() or None
+            if s2 == None:
+                session.flash = "Invalid profile"
+                redirect(URL('default', 'index'))
+            match = db((db.matches.student1_id == me.id and db.matches.student2_id == s2.id)).select().first() or None
+            if match == None:
+                match = db((db.matches.student1_id == s2.id and db.matches.student2_id == me.id)).select().first() or None
+
+            bad_access = (match == None)
+
+    if bad_access:
+        session.flash = "You do not have permission to view this profile"
+        redirect(URL('default', 'index'))
+
+    form = None
+    student = db(db.students.user_id == given_id).select().first() or None
+
+    edit = (request.vars.edit == 'true') and is_mine
+    if edit:
+        form = SQLFORM.factory( Field('firstname', default = get_first_name(), label = "First Name"),
+                                Field('lastname', default = get_last_name(), label = "Last Name"),
+                                Field('Email', requires = IS_EMAIL(), default=auth.user.email),
+                                Field('class_year', requires = IS_IN_SET(CLASS_LEVEL), label = "Year"),
+                                Field('Major', requires = IS_IN_DB(db,db.majors.name)),
+                                Field('Minor', requires = IS_IN_DB(db,db.majors.name)),
+                                Field('Classes', requires = IS_IN_DB(db,db.ucsc_classes.id, db.ucsc_classes._format, multiple = True)),
+                                Field('Biography', 'text'),
+                               )
+        #Use form w/ defaults if they already have profile
+        if(student != None):
+            form = SQLFORM.factory(
+                                Field('firstname', default = get_first_name(), label = "First Name"),
+                                Field('lastname', default = get_last_name(), label = "Last Name"),
+                                Field('Email', requires = IS_EMAIL(), default = student.email),
+                                Field('class_year', requires = IS_IN_SET(CLASS_LEVEL), label = "Year", default = student.class_level),
+                                Field('Major', requires = IS_IN_DB(db,db.majors.name), default = db.majors(db.majors.id==student.major).name ),
+                                Field('Minor', requires = IS_IN_DB(db,db.majors.name), default = db.majors(db.majors.id==student.minor).name ),
+                                Field('Classes', requires = IS_IN_DB(db,db.ucsc_classes.id, db.ucsc_classes._format, multiple = True),
+                                      default = student.class_list),
+                                Field('Biography', 'text', default = student.bio)
+                                )
+
+        form.element('select[name=Classes]')['_style'] = 'width:500px'
+        form.add_button('Cancel', URL('default', 'profile'))
+        if form.process().accepted:
+            if student == None:
+                new_ID = db.students.insert(first_name = form.vars.firstname,
+                                            last_name = form.vars.lastname,
+                                            class_level = form.vars.class_year,
+                                            major = db.majors(db.majors.name==form.vars.Major).id,
+                                            minor = db.majors(db.majors.name==form.vars.Minor).id,
+                                            email = form.vars.Email,
+                                            class_list = form.vars.Classes,
+                                            bio = form.vars.Biography,
+                                            user_id = auth.user_id)
+                redirect(URL("default", "post"))
+            else:
+                 student.update_record(first_name = form.vars.firstname,
+                                       last_name = form.vars.lastname,
+                                       class_level = form.vars.class_year,
+                                       major = db.majors(db.majors.name==form.vars.Major).id,
+                                       minor = db.majors(db.majors.name==form.vars.Minor).id,
+                                       email = form.vars.Email,
+                                       class_list = form.vars.Classes,
+                                       bio = form.vars.Biography)
+                 redirect(URL("default", "profile"))
+
+    else:
+        if(student != None):
+            if(student.user_id != auth.user_id):
+                db.students.last_name.readable = False
+                db.students.email.readable = False
+
+            # We need to use SQLFORM.factory instead of SQLFORM so we can add custom buttons
+            form = SQLFORM.factory(Field('firstname', default = student.first_name, label = "First Name", writable=False),
+                                   Field('lastname', default = student.last_name, label = "Last Name", writable=False),
+                                   Field('Email', default = student.email, writable=False),
+                                   Field('class_year', label = "Year", default = student.class_level, writable=False),
+                                   Field('Major', default = db.majors(db.majors.id==student.major).name, writable=False),
+                                   Field('Minor', default = db.majors(db.majors.id==student.minor).name, writable=False),
+                                   Field('Classes', default = get_class_UL(student.class_list), writable=False),
+                                   Field('Biography', 'text', default = student.bio, writable=False)
+                                  )
+            submit = form.element('input', _type='submit')
+            submit['_style'] = 'display:none'
+            if is_mine:
+                my_vars = request.vars
+                my_vars['edit'] = 'true'
+                form.add_button('Edit', URL('default', 'profile', vars=my_vars))
+            else:
+                match = db(((db.matches.student1_id == me.id) & (db.matches.student2_id == student.id)) |
+                           ((db.matches.student1_id == student.id) & (db.matches.student2_id == me.id))).select().first()
+
+                form.add_button('View Post', URL('default', 'post', vars=dict(id=student.id)))
+                form.add_button('Chat', URL('default', 'conversation', vars=dict(id=match.id)))
+
+    try:
+        title = "My Profile" if is_mine else "Profile - %s" % student.first_name
+    except:
+        title = "Profile"
+    response.title = "Slugslist - %s" % title
+    return dict(form=form, edit=edit, name=get_first_name(), title=title)
+
+#
+# View a user's post. Users can only edit their own posts. Users can only view their own post and those
+# of your matches.
+#
+# Post Fields:
+#  * Student Name
+#  * Classes for which user is looking for a tutor
+#  * Classes user can tutor
+#  * Classes for which user is looking for a study group
+#  * Post Body
+#
+@auth.requires_login()
+def post():
+    #
+    # This code determines whether or not you have access to view the post with the
+    # given ID (no ID automatically redirects to your own page). If the page is not your
+    # own and does not belong to a match, you will be redirected to default/index. If the
+    # post is your own but you have not created one, you will automatically be redirected
+    # to a post edit page.
+    #
+    me = db(db.students.user_id == auth.user_id).select().first() or None
+    if me == None:
+        redirect(URL('default', 'profile', vars=dict(edit='true')))
+    else:
+        given_id = me.id if request.vars.id == None else int(request.vars.id)
+        bad_access = True
+        is_mine = (given_id == me.id)
+        if is_mine:
+            bad_access = False
+        else:
+            match = db((db.matches.student1_id == me.id and db.matches.student2_id == given_id)).select().first()
+            if match == None:
+                match = db((db.matches.student1_id == given_id and db.matches.student2_id == me.id)).select().first()
+
+            bad_access = (match == None)
+
+    if bad_access:
+        session.flash = "You do not have permission to view this post"
+        redirect(URL('default', 'index'))
+
+    buttons = dict()
+    editing = (request.vars.edit == 'true') and is_mine
+    student = db(db.students.id == given_id).select().first() or None
+
+    if student == None:
+        session.flash = "Invalid post"
+        redirect(URL('default', 'index'))
+
+    if is_mine:
+        display_name = "%s %s" % (student.first_name, student.last_name)
+    else:
+        display_name = student.first_name
+
+    post = db(db.student_posts.student_id == student.id).select().first() or None
+    if post == None:
+        if is_mine:
+            if not editing:
+                # If your post doesn't exist, automatically edit it
+                redirect(URL('default', 'post', args=request.args, vars=dict(id=given_id, edit='true')))
+        else:
+            # If the person's post doesn't exist, just go to default/index
+            session.flash = "Invalid post"
+            redirect(URL('default', 'index'))
+
+    last_updated = None if post == None else post.last_updated
+    post_body = "Insert text here" if post == None else post.body
+    looking_for_tutor = [] if post == None else post.looking_for_tutor
+    can_tutor = [] if post == None else post.can_tutor
+    study_group = [] if post == None else post.study_group
+
+    if post == None:
+        post_body = "Insert text here"
+        looking_for_tutor = []
+        can_tutor = []
+        study_group = []
+    else:
+        post_body = post.body
+        looking_for_tutor = post.looking_for_tutor if editing else get_class_UL(post.looking_for_tutor)
+        can_tutor = post.can_tutor if editing else get_class_UL(post.can_tutor)
+        study_group = post.study_group if editing else get_class_UL(post.study_group)
+
+    form = SQLFORM.factory(Field('student_name', 'string', label='Student Name', default=display_name, writable=False),
+                           Field('last_updated', 'datetime', label='Last updated', writable=False, default=last_updated),
+                           Field('looking_for_tutor', 'string', label='Looking for tutor', writable=editing,
+                                 requires=IS_IN_DB(db, db.ucsc_classes.id, db.ucsc_classes._format, multiple=True),
+                                 default=looking_for_tutor),
+                           Field('can_tutor', 'string', label='Can tutor', writable=editing,
+                                 requires=IS_IN_DB(db, db.ucsc_classes.id, db.ucsc_classes._format, multiple=True),
+                                 default=can_tutor),
+                           Field('study_group', 'string', label='Looking for study group', writable=editing,
+                                 requires=IS_IN_DB(db, db.ucsc_classes.id, db.ucsc_classes._format, multiple=True),
+                                 default=study_group),
+                           Field('body', 'text', label='Body', writable=editing, default=post_body)
+                          )
+
+    if editing:
+        for field in ['looking_for_tutor', 'can_tutor', 'study_group']:
+            form.element('select[name=%s]' % field)['_style'] = 'width:500px'
+        form.add_button('Cancel', URL('default', 'post'))
+    else:
+        if is_mine:
+            form.add_button('Edit Post', URL('default', 'post', vars=dict(edit='true')))
+        submit = form.element('input', _type='submit')
+        submit['_style'] = 'display:none'
+
+    if form.process().accepted:
+        if post == None:
+            db.student_posts.insert(student_id = student.id,
+                                    last_updated = datetime.utcnow(),
+                                    looking_for_tutor = form.vars.looking_for_tutor,
+                                    can_tutor = form.vars.can_tutor,
+                                    study_group = form.vars.study_group,
+                                    body = form.vars.body)
+            post = db(db.student_posts.student_id == student.id).select().first()
+        else:
+            post.update_record(student_id = student.id,
+                               last_updated = datetime.utcnow(),
+                               looking_for_tutor = form.vars.looking_for_tutor,
+                               can_tutor = form.vars.can_tutor,
+                               study_group = form.vars.study_group,
+                               body = form.vars.body)
+
+        # Reevaluate matches
+        other_students = db(db.students.id != me.id).select()
+        for other_student in other_students:
+            match = db((db.matches.student1_id == me.id) & (db.matches.student2_id == other_student.id)).select().first() or None
+            if match == None:
+                match = db((db.matches.student1_id == other_student.id) & (db.matches.student2_id == me.id)).select().first() or None
+            our_match = looking_for_id_lists(db, me, other_student)
+
+            #
+            # If this post edit creates a new match, add it to the database and set it to active
+            # If this post edit removes a match, delete it if a conversation is not active
+            #
+            if our_match.students_match and match == None:
+                session.flash = "New match found!"
+                db.matches.insert(student1_id = me.id,
+                                  student2_id = other_student.id,
+                                  student1_active = True,
+                                  student2_active = True)
+            elif (not our_match.students_match) and match != None:
+                thread = db(db.threads.match_id == match.id).select().first() or None
+                if thread == None:
+                    # If the students haven't talked, mark as inactive
+                    match.update_record(student1_active = False,
+                                        student2_active = False)
+                else:
+                    # If only the other student has talked, mark as inactive for user
+                    my_messages = db(db.messages.thread_id == thread.id and sender.id == me.id).select().first() or None
+                    if my_messages == None:
+                        if match.student1_id == me.id:
+                            match.update_record(student1_active = False)
+                        else:
+                            match.update_record(student2_active = False)
+
+        redirect(URL('default', 'post', args=request.args))
+
+    title = "My Post" if is_mine else "Post - %s" % student.first_name
+    response.title = "Slugslist - %s" % title
+    return dict(buttons=buttons, form=form, title=title)
+
+#
+# View your matches. While the front page lists your active matches with no particular sorting, this page
+# shows your matches in sections: students that are looking for a class you tutor, students that can tutor a class
+# in which you need a tutor, and students looking for a study group in a class for which you need one as well.
+#
+# This page also lists inactive matches, which means that you matched at one point, but one of you edited your post
+# such that you do not match anymore.
+#
+@auth.requires_login()
+def matches():
+    me = db(db.students.user_id == auth.user_id).select().first() or None
+    if me == None:
+        redirect(URL('default', 'profile', vars=dict(edit='true')))
+
+    title = "My Matches"
+    my_matches = db((db.matches.student1_id == me.id) | (db.matches.student2_id == me.id)).select()
+    if len(my_matches) == 0:
+        return dict(matches=[], show_looking_for_tutor=False,
+                     show_can_tutor=False, show_study_group=False, title=None);
+
+    matches = []
+
+    view = "all" if request.vars.view == None else request.vars.view
+    show_looking_for_tutor = False
+    show_can_tutor = False
+    show_study_group = False
+    for match in my_matches:
+        if match.student1_id == me.id:
+            if view != "all" and not match.student1_active:
+                continue
+            matches += [matched_student(db, auth, match.student2_id)]
+        else:
+            if view != "all" and not match.student2_active:
+                continue
+            matches += [matched_student(db, auth, match.student1_id)]
+
+        show_looking_for_tutor = (len(matches[-1].match_classes.looking_for_tutor) > 0)
+        show_can_tutor = (len(matches[-1].match_classes.can_tutor) > 0)
+        show_study_group = (len(matches[-1].match_classes.study_group) > 0)
+
+    response.title = "Slugslist - %s" % title
+    return dict(matches=matches, show_looking_for_tutor=show_looking_for_tutor,
+                                 show_can_tutor=show_can_tutor, show_study_group=show_study_group,
+                                 title=title)
+
+@auth.requires_login()
+def conversation():
+    def get_message_form(from_name, to_name, subject, body, sent, subject_writable, body_writable):
+        form = SQLFORM.factory(Field('sender', 'string', label='From', default=from_name, writable=False),
+                               Field('recipient', 'string', label='To', default=to_name, writable=False),
+                               Field('sent', 'datetime', label='Sent', default=sent, readable=(sent != None), writable=False),
+                               Field('subject', 'string', label='Subject', default=subject, writable=subject_writable),
+                               Field('body', 'text', label='Body', default=body, writable=body_writable)
+                              )
+        if not body_writable:
+            submit = form.element('input', _type='submit')
+            submit['_style'] = 'display:none'
+        return form
+
+    me = db(db.students.user_id == auth.user_id).select().first() or None
+    if me == None:
+        redirect(URL('default', 'profile', vars=dict(edit='true')))
+
+    # We need a match ID to do anything
+    if not request.vars.has_key("id"):
+        session.flash = "Invalid access"
+        redirect(URL("default", "index"))
+
+    # Make sure match exists
+    match_id = int(request.vars["id"])
+    match = db(db.matches.id == match_id).select().first() or None
+    if match == None:
+        session.flash = "Invalid conversation."
+        redirect(URL('default', 'index'))
+
+    # Make sure I'm part of the match
+    if not (match.student1_id == me.id or match.student2_id == me.id):
+        session.flash = "Invalid access"
+        redirect(URL('default', 'index'))
+
+    if match.student1_id == me.id:
+        other_student = db(db.students.id == match.student2_id).select().first()
+    else:
+        other_student = db(db.students.id == match.student1_id).select().first()
+
+    # For me, use full name
+    # For other person, use first name only
+    my_name = "%s %s" % (me.first_name, me.last_name)
+    other_name = other_student.first_name
+
+    # Get thread
+    thread = db(db.threads.match_id == match.id).select().first() or None
+    thread_exists = (thread != None)
+    if thread_exists:
+        subject = db(db.threads.id == thread.id).select().first().subject
+    else:
+        subject = "Enter subject here"
+
+    messages = []
+    message_num = 1;
+    if thread_exists:
+        rows = db(db.messages.thread_id == thread.id).select()
+        for row in rows:
+            from_student = db(db.students.id == row.sender_id).select().first()
+            to_student = db(db.students.id == row.recipient_id).select().first()
+
+            if from_student.user_id == me.user_id:
+                from_name = A(my_name, _href=URL('default','profile'))
+                to_name = A(other_name, _href=URL('default', 'profile', vars=dict(id=other_student.id)))
+            else:
+                from_name = A(other_name, _href=URL('default', 'profile', vars=dict(id=other_student.id)))
+                to_name = A(my_name, _href=URL('default','profile'))
+
+            # These messages are the previous ones, they can't be changed
+            messages += [get_message_form(from_name, to_name, subject, row.body, row.send_time, False, False)]
+            message_num += 1
+
+        viewed_messages = db(db.messages.sender_id == other_student.id and db.messages.recipient_id == me.id).select()
+        for m in viewed_messages:
+            m.update_record(viewed = True)
+        # Use this to send a new message
+        messages += [get_message_form(my_name, other_name, subject, "Enter text here", None, False, True)]
+
+        if messages[-1].process().accepted:
+            # Add message, associate it with given thread
+            # thread.id is the current thread's id
+            db.messages.insert(thread_id = thread.id,
+                               num_in_thread = message_num,
+                               send_time = datetime.utcnow(),
+                               sender_id = me.id,
+                               recipient_id = other_student.id,
+                               body = messages[-1].vars.body,
+                               viewed = False)
+            redirect(URL('default','conversation', vars=dict(id=match.id)))
+    else:
+        # Thread doesn't exist, can edit everything
+        messages += [get_message_form(my_name, other_name, subject, "Enter text here", None, True, True)]
+
+        if messages[0].process().accepted:
+            #insert into thread table
+            new_thread_id = db.threads.insert(subject = messages[0].vars.subject, match_id = match.id)
+            #insert into messages table as above.
+            db.messages.insert(thread_id = new_thread_id, num_in_thread = 1, sender_id = me.id, recipient_id = other_student.id,
+                               body = messages[0].vars.body, viewed = False)
+            redirect(URL('default','conversation', vars=dict(id=match.id)))
+
+    title = "Conversation with %s" % other_student.first_name
+    response.title = "Slugslist - %s" % title
+    return dict(messages=messages, title=title)
+
+#
+# This page allows users to anonymously review classes. By default, it lists classes, separated by major. Clicking on a class
+# changes the page to list the reviews for this particular class, followed by a form that allows you to add one of your own.
+#
+@auth.requires_login()
+def classReviews():
+    class class_review_output():
+        def __init__(self,major):
+            self.db_entry = major
+            self.link = A(major.abbreviation, _href=URL('default', ('classReviews#%s' % major.abbreviation)))
+            self.class_list = []
+            for ucsc_class in db(db.ucsc_classes.major == major.id).select():
+                self.class_list += [A(ucsc_class.name, _href=(URL('default', 'classReviews', vars=dict(id=ucsc_class.id))))]
+
+    me = db(db.students.user_id == auth.user_id).select().first() or None
+    if me == None:
+        redirect(URL('default', 'profile', vars=dict(edit='true')))
+
+    outputs = []
+    majors = db(db.majors.name != "None").select(orderby=db.majors.abbreviation)
+    for major in majors:
+        outputs += [class_review_output(major)]
+
+    classesList = None
+    reviewId = request.vars.id or None
+    edit = request.vars.edit or None
+    reviews = None
+    form = None
+    #If nothing in vars, list all the classes w/ links
+    if request.vars.id == None:
+        classesList = db(db.ucsc_classes).select() or None
+    else:
+        #First check if reviewId is valid:
+        test = db(db.ucsc_classes.id == reviewId).select().first()
+        if test == None:
+            session.flash = "Class does not exist"
+            redirect(URL('default', 'classReviews'))
+
+        row = db(db.reviews.class_name == reviewId).select().first()
+        if row == None: edit = 'true'
+        else: reviews = row.review_text
+        #if they want to add a review...
+        if edit == 'true':
+            form = SQLFORM.factory(Field('newReview','text', label = 'Your Review'))
+            form.add_button('Cancel', URL('default', 'classReviews'))
+            if form.process().accepted:
+                if row == None:
+                    i = db.reviews.insert(class_name = reviewId, review_text = form.vars.newReview)
+                    reviews = db(db.reviews.id == i).select().first().review_text
+                else:
+                    reviews = row.review_text
+                    reviews.append(form.vars.newReview)
+                    row.update_record(review_text = reviews)
+                redirect(URL('default','classReviews', vars=dict(id = reviewId)))
+
+    title = "Class Reviews" if request.vars.id == None else "Reviews for %s" % db(db.ucsc_classes.id == request.vars.id).select().first().name
+    response.title = "Slugslist - %s" % title
+    return dict(outputs=outputs, reviews=reviews, form=form, title=title)
+
+#
+# Give a prompt to unmatch with the given user.
+#
+@auth.requires_login()
+def unmatch():
+    me = db(db.students.user_id == auth.user_id).select().first() or None
+    if me == None:
+        redirect(URL('default', 'profile', vars=dict(edit='true')))
+
+    title = "Unmatch"
+    matchId = request.vars.id or None # the row id in matches
+    form = None
+    if matchId == None:
+        session.flash = "Invalid ID"
+        redirect(URL("default","index"))
+    else:
+        row = db(db.matches.id == matchId).select().first() or None
+        if row == None:
+            session.flash = "Invalid ID"
+            redirect(URL("default","index"))
+        elif row.student1_id != me.id and row.student2_id != me.id:
+            session.flash = "Invalid ID"
+            redirect(URL("default","index"))
+        else:
+            if row.student1_id == me.id:
+                title = "Unmatch with %s?" % db(db.students.id == row.student2_id).select().first().first_name
+            else:
+                title = "Unmatch with %s?" % db(db.students.id == row.student1_id).select().first().first_name
+
+            form = FORM.confirm("Unmatch Us",
+                                {'No':URL('default','index')})
+            if form.accepted:
+                db(db.matches.id==matchId).delete()
+                redirect(URL("default","index"))
+
+    response.title = "Slugslist - %s" % title
+    return dict(form=form, title=title)
+
+def about():
+    return dict()
+
+def user():
+    """
+    exposes:
+    http://..../[app]/default/user/login
+    http://..../[app]/default/user/logout
+    http://..../[app]/default/user/register
+    http://..../[app]/default/user/profile
+    http://..../[app]/default/user/retrieve_password
+    http://..../[app]/default/user/change_password
+    http://..../[app]/default/user/manage_users (requires membership in
+    use @auth.requires_login()
+        @auth.requires_membership('group name')
+        @auth.requires_permission('read','table name',record_id)
+    to decorate functions that need access control
+    """
+    response.title = "Slugslist"
+    return dict(form=auth())
+
+
+@cache.action()
+def download():
+    """
+    allows downloading of uploaded files
+    http://..../[app]/default/download/[filename]
+    """
+    return response.download(request, db)
+
+
+def call():
+    """
+    exposes services. for example:
+    http://..../[app]/default/call/jsonrpc
+    decorate with @services.jsonrpc the functions to expose
+    supports xml, json, xmlrpc, jsonrpc, amfrpc, rss, csv
+    """
+    return service()
+
+
+@auth.requires_login() 
+def api():
+    """
+    this is example of API with access control
+    WEB2PY provides Hypermedia API (Collection+JSON) Experimental
+    """
+    from gluon.contrib.hypermedia import Collection
+    rules = {
+        '<tablename>': {'GET':{},'POST':{},'PUT':{},'DELETE':{}},
+        }
+    return Collection(db).process(request,response,rules)

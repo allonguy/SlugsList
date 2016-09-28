@@ -1,0 +1,69 @@
+{{left_sidebar_enabled,right_sidebar_enabled=False,('message' in globals())}}
+{{extend 'layout.html'}}
+
+<!--Homepage-->
+<!--<div class="mainbox">-->
+
+{{if not logged_in:}}
+    <center>
+    <div class="wholeclipboard">
+	<div class="topclipbox"><i class="topclip">&nbsp;&nbsp;&nbsp;&nbsp;</i></div>
+
+	<div class="board shadow">
+	<div class="hiddenpaper"></div>
+	<div class="clipbox"> <div class="postitnote shadow" style="font-family: Lucida Bright,Georgia,serif;  font-size: 20px"> SlugsList is an educational network that allows you to connect with your peers. Built exclusively for UCSC, it is designed to help students with similar needs connect with one another.
+	Log in or sign up to get started!</div>
+	<i class="bclip"></i>
+	</div>
+	<div class="paper"><div class="guestfont"><div class="guestnavbox">
+    {{=A('L o g  i n', _id="guestnav", _href=URL('default','user',args='login'))}} <br>
+    {{=A('R e g i s t e r', _id="guestnav", _href=URL('default','user',args='register'))}} <br>
+	{{=A('A b o u t', _id="guestnav", _href=URL('default','about'))}} <br>
+	</div></div>
+	</div>
+</div>
+</div>
+</div>
+</center>
+<script>$(".side").replaceWith("<div class='.side' '.sidefont'></div>");</script>
+
+
+<!-- Homepage --> 
+
+{{else:}}
+
+    <div class = "mainbox">
+        <center>><div class = "homeBox shadow">
+            <center><div class = "pin shadow"></div></center>
+             SlugsList is an educational network that allows you to connect with your peers. Built exclusively for UCSC, it is designed to help students with similar needs connect with one another.
+                </div>
+            </center
+        <p>
+        <br><br><br>
+        </p>
+
+	{{if len(links) > 0:}}
+        <center><div class = "label shadow">Your Matches</div></center>
+        <br>
+            <div class = "matchContainer">
+                {{for match in links:}}
+                    <div class = "matchBox shadow"><center><div class = "pin shadow"></div></center>
+                        <div id = "matchFont"><center>
+                        <br><br>{{=match.name_link}}
+                        </center>
+                        </div>
+                        <br><div id ="chatSqr" class="shadow">
+                            {{=match.chat_link}}
+                        </div>
+                        <div id="postSqr" class="shadow">
+                            {{=match.post_link}}
+                        </div>
+                        <div id="unmatchSqr" class="shadow">
+                            {{=match.unmatch_link}}
+                        </div>
+                    </div>
+                {{pass}}
+            </div>
+    {{pass}}
+
+{{pass}}
