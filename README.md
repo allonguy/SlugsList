@@ -10,11 +10,11 @@ Project was developed by
 
 # Installation
 
-1) To use the web application, download the web2py framework from http://www.web2py.com/init/default/download.
-2) Extract the web2py framework from the zip file
-3) Start the web2py.exe application to initiate the local server
-4) Navigate to 'My Sites' under top menu bar 'web2py'
-5) Upload the installed packed application: web2py.app.SlugsList.w2p
+1) To use the web application, download the web2py framework from http://www.web2py.com/init/default/download. <br/>
+2) Extract the web2py framework from the zip file <br/>
+3) Start the web2py.exe application to initiate the local server <br/>
+4) Navigate to 'My Sites' under top menu bar 'web2py' <br/>
+5) Upload the installed packed application: web2py.app.SlugsList.w2p <br/>
 
 # Test Account
 
